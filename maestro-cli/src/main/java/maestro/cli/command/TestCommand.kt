@@ -134,13 +134,7 @@ class TestCommand : Callable<Int> {
         TestDebugReporter.install(debugOutputPathAsString = debugOutput)
         val debugOutputPath = TestDebugReporter.getDebugOutputPath()
 
-
-        // Print system environment variables
-        System.getenv().forEach { (k, v) -> println("$k = $v") }
-
-        // TODO: Not 100% sure if this is part of the working solution, could be unnecessary now.
-        // Enable port forwarding early on
-        parent?.deviceId?.let { enablePorts(deviceId = it, port = 9001) }
+        parent?.deviceId?.let { enablePorts(deviceId = it, port = parent.driverHostPort) }
 
         return MaestroSessionManager.newSession(
             host = parent?.host,

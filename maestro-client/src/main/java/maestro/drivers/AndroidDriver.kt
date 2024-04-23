@@ -79,7 +79,7 @@ class AndroidDriver(
 
     override fun open() {
         installMaestroApks()
-        startInstrumentationSession()
+        startInstrumentationSession(hostPort)
 
         try {
             awaitLaunch()
@@ -89,7 +89,7 @@ class AndroidDriver(
         }
     }
 
-    private fun startInstrumentationSession() {
+    private fun startInstrumentationSession(port: Int = 7001) {
         val startTime = System.currentTimeMillis()
         val apiLevel = getDeviceApiLevel()
 
@@ -98,6 +98,7 @@ class AndroidDriver(
             if (apiLevel >= 26) append("-m ")
             append("-e debug false ")
             append("-e class 'dev.mobile.maestro.MaestroDriverService#grpcServer' ")
+            append("-e port $port ")
             append("dev.mobile.maestro.test/androidx.test.runner.AndroidJUnitRunner &\n")
         }
 
