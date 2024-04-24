@@ -29,7 +29,7 @@ import java.util.concurrent.Callable
 class StartDeviceCommand : Callable<Int> {
 
     @CommandLine.ParentCommand
-    private val parent: App? = null
+    private lateinit var parent: App
 
     @CommandLine.Option(
         order = 0,
@@ -95,7 +95,7 @@ class StartDeviceCommand : Callable<Int> {
                 PrintUtils.message(if (p == Platform.IOS) "Launching simulator..." else "Launching emulator...")
                 DeviceService.startDevice(
                     device = device,
-                    driverHostPort = parent?.driverHostPort
+                    driverHostPort = parent.driverHostPort
                 )
             }
         } catch (e: LocaleValidationIosException) {

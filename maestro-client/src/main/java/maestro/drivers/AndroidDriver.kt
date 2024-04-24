@@ -33,9 +33,7 @@ import maestro.MaestroDriverStartupException.*
 import maestro.UiElement.Companion.toUiElementOrNull
 import maestro.android.AndroidAppFiles
 import maestro.android.AndroidLaunchArguments.toAndroidLaunchArguments
-import maestro.utils.BlockingStreamObserver
-import maestro.utils.MaestroTimer
-import maestro.utils.ScreenshotUtils
+import maestro.utils.*
 import maestro.utils.StringUtils.toRegexSafe
 import maestro_android.*
 import net.dongliu.apk.parser.ApkFile
@@ -43,7 +41,6 @@ import okio.*
 import org.slf4j.LoggerFactory
 import org.w3c.dom.Element
 import org.w3c.dom.Node
-import java.io.BufferedReader
 import java.io.File
 import java.io.IOException
 import java.util.UUID
@@ -51,17 +48,12 @@ import java.util.concurrent.*
 import javax.xml.parsers.DocumentBuilderFactory
 import kotlin.io.use
 
-private const val DefaultDriverHostPort = 9001
-
 class AndroidDriver(
     private val dadb: Dadb,
-    hostPort: Int? = null,
-    private var emulatorName: String = "",
+    private val hostPort: Int = DEFAULT_DRIVER_HOST_PORT,
 ) : Driver {
-    private var open = false
-    private val hostPort: Int = hostPort ?: DefaultDriverHostPort
 
-    private val channel = ManagedChannelBuilder.forAddress("localhost", this.hostPort)
+    private val channel = ManagedChannelBuilder.forAddress("localhost", hostPort)
         .usePlaintext()
         .build()
     private val blockingStub = MaestroDriverGrpc.newBlockingStub(channel)
@@ -87,9 +79,11 @@ class AndroidDriver(
             instrumentationSession?.close()
             return
         }
+
+        allocateForwarder()
     }
 
-    private fun startInstrumentationSession(port: Int = 7001) {
+    private fun startInstrumentationSession(port: Int = DEFAULT_DRIVER_HOST_PORT) {
         val startTime = System.currentTimeMillis()
         val apiLevel = getDeviceApiLevel()
 
@@ -98,11 +92,10 @@ class AndroidDriver(
             if (apiLevel >= 26) append("-m ")
             append("-e debug false ")
             append("-e class 'dev.mobile.maestro.MaestroDriverService#grpcServer' ")
-            append("-e port $port ")
+            append("-e $DRIVER_HOST_PORT_KEY $port")
             append("dev.mobile.maestro.test/androidx.test.runner.AndroidJUnitRunner &\n")
         }
 
-        open = true
         while (System.currentTimeMillis() - startTime < getStartupTimeout()) {
             instrumentationSession = dadb.openShell(instrumentationCommand)
 
@@ -121,11 +114,22 @@ class AndroidDriver(
         if (response.exitCode != 0) {
             throw IOException("Failed to get device API level: ${response.errorOutput}")
         }
-        return response.output.trim().toIntOrNull()
-            ?: throw IOException("Invalid API level: ${response.output}")
+        return response.output.trim().toIntOrNull() ?: throw IOException("Invalid API level: ${response.output}")
     }
 
 
+    private fun allocateForwarder() {
+        PORT_TO_FORWARDER[hostPort]?.close()
+        PORT_TO_ALLOCATION_POINT[hostPort]?.let {
+            LOGGER.warn("Port $hostPort was already allocated. Allocation point: $it")
+        }
+
+        PORT_TO_FORWARDER[hostPort] = dadb.tcpForward(
+            hostPort = hostPort,
+            targetPort = DEFAULT_DRIVER_HOST_PORT
+        )
+        PORT_TO_ALLOCATION_POINT[hostPort] = Exception().stackTraceToString()
+    }
 
     private fun awaitLaunch() {
         val startTime = System.currentTimeMillis()
@@ -138,7 +142,7 @@ class AndroidDriver(
             Thread.sleep(100)
         }
 
-        throw AndroidDriverTimeoutException("Maestro Android driver did not start up in time  ---  port was   dadb.open( tcp:${hostPort} )")
+        throw AndroidDriverTimeoutException("Maestro Android driver did not start up in time")
     }
 
     override fun close() {
@@ -147,6 +151,9 @@ class AndroidDriver(
             resetProxy()
         }
 
+        PORT_TO_FORWARDER[hostPort]?.close()
+        PORT_TO_FORWARDER.remove(hostPort)
+        PORT_TO_ALLOCATION_POINT.remove(hostPort)
         uninstallMaestroApks()
         instrumentationSession?.close()
         instrumentationSession = null
@@ -176,10 +183,6 @@ class AndroidDriver(
         launchArguments: Map<String, Any>,
         sessionId: UUID?,
     ) {
-        // Pick device flow normally doesn't open() the driver for some reason, this is the third part of the sharding patch
-        if(!open)
-            open()
-
         if (!isPackageInstalled(appId)) {
             throw IllegalArgumentException("Package $appId is not installed")
         }
@@ -887,7 +890,7 @@ class AndroidDriver(
 
         val maestroAppApk = File.createTempFile("maestro-app", ".apk")
 
-        Maestro::class.java.getResourceAsStream("/maestro-app.apk")!!.let {
+        Maestro::class.java.getResourceAsStream("/maestro-app.apk")?.let {
             val bufferedSink = maestroAppApk.sink().buffer()
             bufferedSink.writeAll(it.source())
             bufferedSink.flush()
@@ -904,8 +907,7 @@ class AndroidDriver(
 
         val maestroServerApk = File.createTempFile("maestro-server", ".apk")
 
-        // APKs are important for Sharding. Abandon ship if they're not there, instead of moving on with defaults
-        Maestro::class.java.getResourceAsStream("/maestro-server.apk")!!.let {
+        Maestro::class.java.getResourceAsStream("/maestro-server.apk")?.let {
             val bufferedSink = maestroServerApk.sink().buffer()
             bufferedSink.writeAll(it.source())
             bufferedSink.flush()

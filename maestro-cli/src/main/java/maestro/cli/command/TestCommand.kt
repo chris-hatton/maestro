@@ -39,7 +39,6 @@ import okio.buffer
 import okio.sink
 import picocli.CommandLine
 import picocli.CommandLine.Option
-import java.io.BufferedReader
 import java.io.File
 import java.util.concurrent.Callable
 import kotlin.io.path.absolutePathString
@@ -56,7 +55,7 @@ class TestCommand : Callable<Int> {
     var disableANSIMixin: DisableAnsiMixin? = null
 
     @CommandLine.ParentCommand
-    private val parent: App? = null
+    private lateinit var parent: App
 
     @CommandLine.Parameters
     private lateinit var flowFile: File
@@ -115,7 +114,7 @@ class TestCommand : Callable<Int> {
     }
 
     override fun call(): Int {
-        if (parent?.platform != null) {
+        if (parent.platform != null) {
             throw CliError("--platform option was deprecated. You can remove it to run your test.")
         }
 
@@ -127,19 +126,17 @@ class TestCommand : Callable<Int> {
 
         val deviceId =
             if (isWebFlow()) "chromium".also { PrintUtils.warn("Web support is an experimental feature and may be removed in future versions.\n") }
-            else parent?.deviceId
+            else parent.deviceId
 
         env = env.withInjectedShellEnvVars()
 
         TestDebugReporter.install(debugOutputPathAsString = debugOutput)
         val debugOutputPath = TestDebugReporter.getDebugOutputPath()
 
-        parent?.deviceId?.let { enablePorts(deviceId = it, port = parent.driverHostPort) }
-
         return MaestroSessionManager.newSession(
-            host = parent?.host,
-            port = parent?.port,
-            driverHostPort = parent?.driverHostPort,
+            host = parent.host,
+            port = parent.port,
+            driverHostPort = parent.driverHostPort,
             deviceId = deviceId,
         ) { session ->
             val maestro = session.maestro
@@ -197,32 +194,5 @@ class TestCommand : Callable<Int> {
         println()
         println("==== Debug output (logs & screenshots) ====")
         PrintUtils.message(TestDebugReporter.getDebugOutputPath().absolutePathString())
-    }
-}
-
-fun String.runCommandAndCaptureOutput(): String = ProcessBuilder(*split(" ").toTypedArray())
-    .redirectErrorStream(false)
-    .start()
-    .inputStream.bufferedReader()
-    .use(BufferedReader::readText)
-
-private fun enablePorts(deviceId: String, port: Int) {
-    // Check if the port is already forwarded
-    fun isPortForwarded(): Boolean {
-        val listOutput = "/opt/homebrew/bin/adb -s $deviceId forward --list".runCommandAndCaptureOutput()
-        return Regex("tcp:$port\\s+tcp:$port").containsMatchIn(listOutput)
-    }
-
-    // Apply port forwarding rule
-    fun forwardPort() {
-        "adb -s $deviceId forward tcp:$port tcp:$port".runCommandAndCaptureOutput().also {
-            println("Port $port is now forwarded for device $deviceId.")
-        }
-    }
-
-    // Logic to check and apply forwarding
-    when {
-        !isPortForwarded() -> forwardPort()
-        else -> println("Port $port is already forwarded for device $deviceId.")
     }
 }

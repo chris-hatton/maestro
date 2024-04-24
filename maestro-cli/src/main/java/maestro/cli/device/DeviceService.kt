@@ -21,7 +21,10 @@ import java.util.concurrent.TimeoutException
 
 object DeviceService {
     val logger = LoggerFactory.getLogger(DeviceService::class.java)
-    fun startDevice(device: Device.AvailableForLaunch, driverHostPort: Int?): Device.Connected {
+    fun startDevice(
+        device: Device.AvailableForLaunch,
+        driverHostPort: Int,
+    ): Device.Connected {
         when (device.platform) {
             Platform.IOS -> {
                 try {

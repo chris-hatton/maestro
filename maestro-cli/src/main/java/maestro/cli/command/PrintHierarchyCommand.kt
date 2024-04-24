@@ -44,14 +44,14 @@ class PrintHierarchyCommand : Runnable {
     var disableANSIMixin: DisableAnsiMixin? = null
 
     @CommandLine.ParentCommand
-    private val parent: App? = null
+    private lateinit var parent: App
 
     override fun run() {
         MaestroSessionManager.newSession(
-            host = parent?.host,
-            port = parent?.port,
-            driverHostPort = parent?.driverHostPort,
-            deviceId = parent?.deviceId,
+            host = parent.host,
+            port = parent.port,
+            driverHostPort = parent.driverHostPort,
+            deviceId = parent.deviceId,
         ) { session ->
             Insights.onInsightsUpdated {
                 val message = StringBuilder()

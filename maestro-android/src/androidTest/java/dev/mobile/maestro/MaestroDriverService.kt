@@ -48,6 +48,8 @@ import com.google.protobuf.ByteString
 import io.grpc.Status
 import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder
 import io.grpc.stub.StreamObserver
+import maestro.utils.DEFAULT_DRIVER_HOST_PORT
+import maestro.utils.DRIVER_HOST_PORT_KEY
 import maestro_android.*
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -76,13 +78,13 @@ class MaestroDriverService {
         val uiDevice = UiDevice.getInstance(instrumentation)
         val uiAutomation = instrumentation.uiAutomation
 
-        val port = InstrumentationRegistry.getArguments().getString("port", "7001").toInt()
+        val arguments = InstrumentationRegistry.getArguments()
 
+        val driverHostPort: Int = arguments.getString(DRIVER_HOST_PORT_KEY)
+            ?.toIntOrNull()
+            ?: DEFAULT_DRIVER_HOST_PORT
 
-
-        println("---------- RUNNING ON PORT [ ${port} ]------------------- ")
-
-        NettyServerBuilder.forPort(port)
+        NettyServerBuilder.forPort(driverHostPort)
             .addService(Service(uiDevice, uiAutomation))
             .build()
             .start()
@@ -91,6 +93,7 @@ class MaestroDriverService {
             Thread.sleep(100)
         }
     }
+
 }
 
 class Service(

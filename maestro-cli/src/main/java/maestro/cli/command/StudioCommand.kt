@@ -27,7 +27,7 @@ class StudioCommand : Callable<Int> {
     var disableANSIMixin: DisableAnsiMixin? = null
 
     @CommandLine.ParentCommand
-    private val parent: App? = null
+    private lateinit var parent: App
 
     @CommandLine.Option(
         names = ["--debug-output"],
@@ -42,17 +42,17 @@ class StudioCommand : Callable<Int> {
     private var noWindow: Boolean? = null
 
     override fun call(): Int {
-        if (parent?.platform != null) {
+        if (parent.platform != null) {
             throw CliError("--platform option was deprecated. You can remove it to run your test.")
         }
 
         TestDebugReporter.install(debugOutputPathAsString = debugOutput)
 
         MaestroSessionManager.newSession(
-            host = parent?.host,
-            port = parent?.port,
-            driverHostPort = parent?.driverHostPort,
-            deviceId = parent?.deviceId,
+            host = parent.host,
+            port = parent.port,
+            driverHostPort = parent.driverHostPort,
+            deviceId = parent.deviceId,
             isStudio = true
         ) { session ->
             val port = getFreePort()

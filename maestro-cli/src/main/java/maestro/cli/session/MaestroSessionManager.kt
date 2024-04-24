@@ -58,7 +58,7 @@ object MaestroSessionManager {
     fun <T> newSession(
         host: String?,
         port: Int?,
-        driverHostPort: Int?,
+        driverHostPort: Int,
         deviceId: String?,
         isStudio: Boolean = false,
         block: (MaestroSession) -> T,
@@ -67,7 +67,7 @@ object MaestroSessionManager {
             host = host,
             port = port,
             driverHostPort = driverHostPort,
-            deviceId = deviceId
+            deviceId = deviceId,
         )
         val sessionId = UUID.randomUUID().toString()
 
@@ -111,7 +111,7 @@ object MaestroSessionManager {
     private fun selectDevice(
         host: String?,
         port: Int?,
-        driverHostPort: Int?,
+        driverHostPort: Int,
         deviceId: String?,
     ): SelectedDevice {
         if (deviceId == "chromium") {
@@ -121,7 +121,10 @@ object MaestroSessionManager {
         }
 
         if (host == null) {
-            val device = PickDeviceInteractor.pickDevice(deviceId, driverHostPort)
+            val device = PickDeviceInteractor.pickDevice(
+                deviceId = deviceId,
+                driverHostPort = driverHostPort,
+            )
 
             return SelectedDevice(
                 platform = device.platform,
@@ -150,15 +153,15 @@ object MaestroSessionManager {
         selectedDevice: SelectedDevice,
         connectToExistingSession: Boolean,
         isStudio: Boolean,
-        driverHostPort: Int?,
+        driverHostPort: Int,
     ): MaestroSession {
         return when {
             selectedDevice.device != null -> MaestroSession(
                 maestro = when (selectedDevice.device.platform) {
                     Platform.ANDROID -> createAndroid(
-                        selectedDevice.device.instanceId,
-                        !connectToExistingSession,
-                        driverHostPort,
+                        instanceId = selectedDevice.device.instanceId,
+                        openDriver = !connectToExistingSession,
+                        driverHostPort = driverHostPort,
                     )
 
                     Platform.IOS -> createIOS(
@@ -171,15 +174,18 @@ object MaestroSessionManager {
                 device = selectedDevice.device,
             )
 
-            selectedDevice.platform == Platform.ANDROID -> MaestroSession(
-                maestro = pickAndroidDevice(
-                    selectedDevice.host,
-                    selectedDevice.port,
-                    driverHostPort,
-                    !connectToExistingSession,
-                ),
-                device = null,
-            )
+            selectedDevice.platform == Platform.ANDROID -> {
+                println("Creating Maestro session with port ${selectedDevice.port} and driver host port $driverHostPort")
+                MaestroSession(
+                    maestro = pickAndroidDevice(
+                        host = selectedDevice.host,
+                        port = selectedDevice.port,
+                        driverHostPort = driverHostPort,
+                        openDriver = !connectToExistingSession,
+                    ),
+                    device = null,
+                )
+            }
 
             selectedDevice.platform == Platform.IOS -> MaestroSession(
                 maestro = pickIOSDevice(
@@ -234,7 +240,7 @@ object MaestroSessionManager {
     private fun pickAndroidDevice(
         host: String?,
         port: Int?,
-        driverHostPort: Int?,
+        driverHostPort: Int,
         openDriver: Boolean,
     ): Maestro {
         val dadb = if (port != null) {
@@ -251,12 +257,9 @@ object MaestroSessionManager {
         )
     }
 
-    // Kaan: Default is always 5037, on Adb daemon, as well as this library
-    // Part two of sharding patch requires adbServerPort to be [ 5037 + shardIndex ]
-    // Running on a dedicated port for each shard's ADB / RPC stream, instrumenting 1 device per adb server
     private fun createAdbServerDadb(): Dadb? {
         return try {
-            AdbServer.createDadb(adbServerPort = 5038)  // TODO: Iterate 5037 + SHARD_INDEX
+            AdbServer.createDadb()
         } catch (ignored: Exception) {
             null
         }
@@ -265,13 +268,20 @@ object MaestroSessionManager {
     private fun pickIOSDevice(
         deviceId: String?,
         openDriver: Boolean,
-        driverHostPort: Int?,
+        driverHostPort: Int,
     ): Maestro {
-        val device = PickDeviceInteractor.pickDevice(deviceId, driverHostPort)
+        val device = PickDeviceInteractor.pickDevice(
+            deviceId = deviceId,
+            driverHostPort = driverHostPort,
+        )
         return createIOS(device.instanceId, openDriver)
     }
 
-    private fun createAndroid(instanceId: String, openDriver: Boolean, driverHostPort: Int?): Maestro {
+    private fun createAndroid(
+        instanceId: String,
+        openDriver: Boolean,
+        driverHostPort: Int,
+    ): Maestro {
         val driver = AndroidDriver(
             dadb = Dadb
                 .list()
@@ -279,7 +289,6 @@ object MaestroSessionManager {
                 ?: Dadb.discover()
                 ?: error("Unable to find device with id $instanceId"),
             hostPort = driverHostPort,
-            emulatorName = instanceId,
         )
 
         return Maestro.android(

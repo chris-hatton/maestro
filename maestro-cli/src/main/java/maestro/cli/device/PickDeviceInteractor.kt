@@ -3,10 +3,14 @@ package maestro.cli.device
 import maestro.cli.CliError
 import maestro.cli.util.EnvUtils
 import maestro.cli.util.PrintUtils
+import maestro.utils.DEFAULT_DRIVER_HOST_PORT
 
 object PickDeviceInteractor {
 
-    fun pickDevice(deviceId: String? = null, driverHostPort: Int? = null): Device.Connected {
+    fun pickDevice(
+        deviceId: String? = null,
+        driverHostPort: Int,
+    ): Device.Connected {
         if (deviceId != null) {
             return DeviceService.listConnectedDevices()
                 .find {
@@ -25,7 +29,10 @@ object PickDeviceInteractor {
                         Platform.WEB -> PrintUtils.message("Launching ${result.description}")
                     }
 
-                    result = DeviceService.startDevice(result, driverHostPort)
+                    result = DeviceService.startDevice(
+                        device = result,
+                        driverHostPort = driverHostPort,
+                    )
                 }
 
                 if (result !is Device.Connected) {
@@ -100,7 +107,7 @@ object PickDeviceInteractor {
 }
 
 fun main() {
-    println(PickDeviceInteractor.pickDevice(driverHostPort = 9001))
+    println(PickDeviceInteractor.pickDevice(driverHostPort = DEFAULT_DRIVER_HOST_PORT))
 
     println("Ready")
     while (!Thread.interrupted()) {

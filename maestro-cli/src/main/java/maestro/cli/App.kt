@@ -26,10 +26,11 @@ import maestro.cli.update.Updates
 import maestro.cli.util.ErrorReporter
 import maestro.cli.view.box
 import maestro.debuglog.DebugLogStore
+import maestro.utils.DEFAULT_ADB_PORT
+import maestro.utils.DEFAULT_DRIVER_HOST_PORT
 import picocli.CommandLine
 import picocli.CommandLine.Command
 import picocli.CommandLine.Option
-import java.io.BufferedReader
 import java.util.*
 import kotlin.system.exitProcess
 
@@ -65,10 +66,10 @@ class App {
     var host: String? = null
 
     @Option(names = ["--driver-host-port"], hidden = true)
-    var driverHostPort: Int = 9001
+    var driverHostPort: Int = DEFAULT_DRIVER_HOST_PORT
 
     @Option(names = ["--port"], hidden = true)
-    var port: Int? = null
+    var port: Int = DEFAULT_ADB_PORT
 
     @Option(names = ["--device", "--udid"], description = ["(Optional) Select a device to run on explicitly"])
     var deviceId: String? = null
@@ -106,7 +107,7 @@ fun main(args: Array<String>) {
             println()
 
             // make errors red
-            cmd.colorScheme =  CommandLine.Help.ColorScheme.Builder()
+            cmd.colorScheme = CommandLine.Help.ColorScheme.Builder()
                 .errors(CommandLine.Help.Ansi.Style.fg_red)
                 .build()
 
