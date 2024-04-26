@@ -209,7 +209,7 @@ fun String.runCommandAndCaptureOutput(): String = ProcessBuilder(*split(" ").toT
 private fun enablePorts(deviceId: String, port: Int) {
     // Check if the port is already forwarded
     fun isPortForwarded(): Boolean {
-        val listOutput = "/opt/homebrew/bin/adb -s $deviceId forward --list".runCommandAndCaptureOutput()
+        val listOutput = "adb -s $deviceId forward --list".runCommandAndCaptureOutput()
         return Regex("tcp:$port\\s+tcp:$port").containsMatchIn(listOutput)
     }
 
